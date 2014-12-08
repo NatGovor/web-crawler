@@ -11,16 +11,31 @@
   (with-open [rdr (io/reader file-name)]
     (doall (line-seq rdr))))
 
-(defn fetch-html
+(defn get-valid-links
+  [url links]
+  (map #(not (= (first %) "#")) links))
+
+(defn get-links
+  [html]
+  (map :href (map :attrs (html/select html #{[:a]}))))
+
+(defn parse-document
+  [url response]
+  (let [content-type ((response :headers) :content-type)]
+    (if (re-find #"text/html" content-type)
+      (get-links (html/html-snippet (response :body)))
+      '())))
+
+(defn fetch-page
   [url]
   (println "try fetch")
   (try+
-   (client/get url {:throw-exceptions false})
-   (catch Object _ {:status 404 :headers nil})))
+   (client/get url)
+   (catch Object _ {:status 404})))
 
 (defn parse-html-page
   [url]
-  (let [html (fetch-html url)]
+  (let [html (fetch-page url)]
     (println html)))
 
 (defn visit-node
@@ -41,7 +56,12 @@
   [& args]
   (let [file-name "resources/urls.txt"
         depth 1]
-    (crawling file-name depth)))
+    (parse-document "https://github.com/" (fetch-page "https://github.com/"))))
+    ;(map :href
+    ;   (map :attrs
+    ;         (html/select (html/html-resource (java.net.URL. "http://example.com/")) #{[:a]})))))
+
+    ;(crawling file-name depth)))
   ;(let
   ;  [links (map :href
   ;     (map :attrs
