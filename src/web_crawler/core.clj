@@ -11,9 +11,19 @@
   (with-open [rdr (io/reader file-name)]
     (doall (line-seq rdr))))
 
+(defn get-relative-links
+  [links]
+  (filter #(and (= (.indexOf % "/") 0) (= (.indexOf % "#") -1)) links))
+
+(defn get-absolute-links
+  [links]
+  (filter #(or (= (.indexOf % "http://") 0) (= (.indexOf % "https://") 0)) links))
+
 (defn get-valid-links
   [url links]
-  (map #(not (= (first %) "#")) links))
+  (let [relative-links (get-relative-links links)
+        absolute-links (get-absolute-links links)]
+    (concat relative-links absolute-links)))
 
 (defn get-links
   [html]
@@ -23,7 +33,7 @@
   [url response]
   (let [content-type ((response :headers) :content-type)]
     (if (re-find #"text/html" content-type)
-      (get-links (html/html-snippet (response :body)))
+      (get-valid-links "url" (get-links (html/html-snippet (response :body))))
       '())))
 
 (defn fetch-page
