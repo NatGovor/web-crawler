@@ -6,7 +6,8 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [enlive "1.1.5"]
                  [clj-http "1.0.1"]
-                 [slingshot "0.12.1"]]
+                 [slingshot "0.12.1"]
+                 [clojurewerkz/urly "1.0.0"]]
   :main ^:skip-aot web-crawler.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

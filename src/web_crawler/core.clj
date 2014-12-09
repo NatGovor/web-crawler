@@ -4,16 +4,23 @@
   (:require [clojure.java.io :as io])
   (:require [clojure.string :as string])
   (:require [clj-http.client :as client])
-  (:use [slingshot.slingshot :only [try+]]))
+  (:use [slingshot.slingshot :only [try+]])
+  (:refer-clojure :exclude [resolve])
+  (:use clojurewerkz.urly.core)
+  (:import [java.net URI URL]))
 
 (defn read-file
   [file-name]
   (with-open [rdr (io/reader file-name)]
     (doall (line-seq rdr))))
 
+(defn resolve-relative-links
+  [url relative-links]
+  (map #(resolve url %) relative-links))
+
 (defn get-relative-links
-  [links]
-  (filter #(and (= (.indexOf % "/") 0) (= (.indexOf % "#") -1)) links))
+  [url links]
+  (resolve-relative-links url (filter #(and (= (.indexOf % "/") 0) (= (.indexOf % "#") -1)) links)))
 
 (defn get-absolute-links
   [links]
@@ -21,7 +28,7 @@
 
 (defn get-valid-links
   [url links]
-  (let [relative-links (get-relative-links links)
+  (let [relative-links (get-relative-links url links)
         absolute-links (get-absolute-links links)]
     (concat relative-links absolute-links)))
 
@@ -33,7 +40,7 @@
   [url response]
   (let [content-type ((response :headers) :content-type)]
     (if (re-find #"text/html" content-type)
-      (get-valid-links "url" (get-links (html/html-snippet (response :body))))
+      (get-valid-links url (get-links (html/html-snippet (response :body))))
       '())))
 
 (defn fetch-page
