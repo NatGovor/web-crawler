@@ -45,40 +45,45 @@
 
 (defn fetch-page
   [url]
-  (println "try fetch")
   (try+
    (client/get url)
    (catch Object _ {:status 404})))
 
 (defn parse-page
-  [url]
+  [url result]
   (let [html (fetch-page url)
         status (html :status)]
     (if (not= status 404)
-      (println url (count (parse-document url html)))
+      (let [new-urls (parse-document url html)]
+        (swap! result conj new-urls)
+        new-urls)
       (println url "bad"))))
 
-(defn visit-node
-  [urls depth]
+(defn visit-link
+  [urls depth result]
   (let [new-depth (dec depth)]
-    ;(if (< depth 1)
-    ;  (println new-depth)
-    ;  (println new-depth))))
-    ;(map #(parse-html-page url) urls)))
-    (map #(parse-page %) urls)))
+    (pmap #(parse-page % result) urls)))
+
+(defn crawling-loop
+  [urls depth result]
+  (let [new-depth (dec depth)]
+    (println depth)
+    (if (> depth 0)
+      (doseq [new-urls (visit-link urls depth result)]
+        (crawling-loop new-urls new-depth result)))))
 
 (defn crawling
-  [file-name depth]
+  [file-name depth result]
   (let [urls (read-file file-name)]
-    (visit-node urls depth)))
+    (crawling-loop urls depth result)))
 
 (defn -main
   [& args]
   (let [file-name "resources/urls.txt"
-        depth 1]
-    ;(parse-document "https://github.com/" (fetch-page "https://github.com/"))))
-    ;(parse-page "https://github.com/")))
-    (crawling file-name 1)))
+        depth 1
+        result (atom[])]
+    (crawling file-name 2 result)
+    (println @result)))
 
     ;(map :href
     ;   (map :attrs
