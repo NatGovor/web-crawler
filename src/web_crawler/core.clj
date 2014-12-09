@@ -14,6 +14,10 @@
   (with-open [rdr (io/reader file-name)]
     (doall (line-seq rdr))))
 
+(defn remove-nils
+  [col]
+  (filter #(not (nil? %)) col))
+
 (defn resolve-relative-links
   [url relative-links]
   (map #(resolve url %) relative-links))
@@ -28,15 +32,16 @@
 
 (defn get-valid-links
   [url links]
-  (let [relative-links (get-relative-links url links)
-        absolute-links (get-absolute-links links)]
+  (let [valid-links (remove-nils links)
+        relative-links (get-relative-links url valid-links)
+        absolute-links (get-absolute-links valid-links)]
     (concat relative-links absolute-links)))
 
 (defn get-links
   [html]
   (map :href (map :attrs (html/select html #{[:a]}))))
 
-(defn parse-document
+(defn parse-content
   [url response]
   (let [content-type ((response :headers) :content-type)]
     (if (re-find #"text/html" content-type)
@@ -54,20 +59,21 @@
   (let [html (fetch-page url)
         status (html :status)]
     (if (not= status 404)
-      (let [new-urls (parse-document url html)]
+      (let [new-urls (parse-content url html)]
         (swap! result conj new-urls)
+        (println url (count new-urls))
         new-urls)
-      (println url "bad"))))
+      ; bad url
+      (swap! result conj '()))))
 
 (defn visit-link
   [urls depth result]
   (let [new-depth (dec depth)]
-    (pmap #(parse-page % result) urls)))
+    (map #(parse-page % result) urls)))
 
 (defn crawling-loop
   [urls depth result]
   (let [new-depth (dec depth)]
-    (println depth)
     (if (> depth 0)
       (doseq [new-urls (visit-link urls depth result)]
         (crawling-loop new-urls new-depth result)))))
@@ -80,10 +86,11 @@
 (defn -main
   [& args]
   (let [file-name "resources/urls.txt"
-        depth 1
+        depth 2
         result (atom[])]
-    (crawling file-name 2 result)
-    (println @result)))
+    (crawling file-name depth result)
+    (println (count @result))))
+    ;(println @result)))
 
     ;(map :href
     ;   (map :attrs
