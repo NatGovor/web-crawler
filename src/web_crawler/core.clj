@@ -71,7 +71,7 @@
 (defn visit-link
   [urls depth node]
   (let [new-depth (dec depth)]
-    (map #(parse-page % new-depth node) urls)))
+    (pmap #(parse-page % new-depth node) urls)))
 
 (defn crawling-loop
   [node urls depth]
