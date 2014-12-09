@@ -14,6 +14,10 @@
   (with-open [rdr (io/reader file-name)]
     (doall (line-seq rdr))))
 
+(defn create-node
+  [url status depth children urls]
+  {:url url :status status :depth depth :children children :urls urls})
+
 (defn remove-nils
   [col]
   (filter #(not (nil? %)) col))
@@ -55,52 +59,69 @@
    (catch Object _ {:status 404})))
 
 (defn parse-page
-  [url result]
+  [url depth node]
   (let [html (fetch-page url)
-        status (html :status)]
-    (if (not= status 404)
-      (let [new-urls (parse-content url html)]
-        (swap! result conj new-urls)
-        (println url (count new-urls))
-        new-urls)
-      ; bad url
-      (swap! result conj '()))))
+        status (html :status)
+        new-node (if (not= status 404)
+                   (create-node url status depth (atom '()) (parse-content url html))
+                   (create-node url status depth (atom '()) '()))]
+    (swap! (:children node) conj new-node)
+    new-node))
 
 (defn visit-link
-  [urls depth result]
+  [urls depth node]
   (let [new-depth (dec depth)]
-    (map #(parse-page % result) urls)))
+    (map #(parse-page % new-depth node) urls)))
 
 (defn crawling-loop
-  [urls depth result]
+  [node urls depth]
   (let [new-depth (dec depth)]
     (if (> depth 0)
-      (doseq [new-urls (visit-link urls depth result)]
-        (crawling-loop new-urls new-depth result)))))
+      (doseq [new-node (visit-link urls depth node)]
+        (crawling-loop new-node (:urls new-node) new-depth)))
+    node))
 
 (defn crawling
-  [file-name depth result]
-  (let [urls (read-file file-name)]
-    (crawling-loop urls depth result)))
+  [file-name depth]
+  (let [urls (read-file file-name)
+        root  (create-node "root" nil 0 (atom '()) urls)]
+    (crawling-loop root urls depth)
+    root))
+
+(defn get-indent
+  [n]
+  (apply str (repeat n " ")))
+
+(defn get-message
+  [status links-count]
+  (if (= status 404)
+    (str " bad")
+    (if (= (.indexOf (str status) "3") 0)
+      (str " redirect " links-count)
+      (str links-count))))
+
+(defn print-node
+  [node level]
+  (let [indent (* 2 level)
+        uri (:url node)
+        status (:status node)
+        links-count (count (:urls node))]
+    (println (get-indent indent) uri (get-message status links-count))))
+
+(defn walk-tree
+  [node level]
+  (print-node node level)
+  (doseq [child @(:children node)] (walk-tree child (inc level))))
+
+(defn print-tree
+  [root]
+  (do-walk root 0))
+
 
 (defn -main
   [& args]
   (let [file-name "resources/urls.txt"
         depth 2
-        result (atom[])]
-    (crawling file-name depth result)
-    (println (count @result))))
-    ;(println @result)))
-
-    ;(map :href
-    ;   (map :attrs
-    ;         (html/select (html/html-resource (java.net.URL. "http://example.com/")) #{[:a]})))))
-
-    ;(crawling file-name depth)))
-  ;(let
-  ;  [links (map :href
-  ;     (map :attrs
-  ;           (html/select (html/html-resource (java.net.URL. "https://github.com/")) #{[:a]})))
-  ;   ]
-  ;  (println (string/join "\n" links))))
+        tree (crawling file-name depth)]
+    (print-tree tree)))
 
