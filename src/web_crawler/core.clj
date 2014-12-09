@@ -50,10 +50,13 @@
    (client/get url)
    (catch Object _ {:status 404})))
 
-(defn parse-html-page
+(defn parse-page
   [url]
-  (let [html (fetch-page url)]
-    (println html)))
+  (let [html (fetch-page url)
+        status (html :status)]
+    (if (not= status 404)
+      (println url (count (parse-document url html)))
+      (println url "bad"))))
 
 (defn visit-node
   [urls depth]
@@ -62,7 +65,7 @@
     ;  (println new-depth)
     ;  (println new-depth))))
     ;(map #(parse-html-page url) urls)))
-    (parse-html-page (first urls))))
+    (map #(parse-page %) urls)))
 
 (defn crawling
   [file-name depth]
@@ -73,7 +76,10 @@
   [& args]
   (let [file-name "resources/urls.txt"
         depth 1]
-    (parse-document "https://github.com/" (fetch-page "https://github.com/"))))
+    ;(parse-document "https://github.com/" (fetch-page "https://github.com/"))))
+    ;(parse-page "https://github.com/")))
+    (crawling file-name 1)))
+
     ;(map :href
     ;   (map :attrs
     ;         (html/select (html/html-resource (java.net.URL. "http://example.com/")) #{[:a]})))))
