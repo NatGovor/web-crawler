@@ -22,6 +22,12 @@
   [col]
   (filter #(not (nil? %)) col))
 
+(defn ?redirect
+  [status]
+  (if (some #(= status %) '(301 302 303 305 307))
+    true
+    false))
+
 (defn resolve-relative-links
   [url relative-links]
   (map #(resolve url %) relative-links))
@@ -94,12 +100,6 @@
   [n]
   (apply str (repeat n " ")))
 
-(defn ?redirect
-  [status]
-  (if (some #(= status %) '(301 302 303 305 307))
-    true
-    false))
-
 (defn get-message
   [status links-count location]
   (if (= status 404)
@@ -110,7 +110,7 @@
 
 (defn print-node
   [node level]
-  (let [indent (* 2 level)
+  (let [indent (* 4 level)
         uri (:url node)
         status (:status node)
         links-count (count (:urls node))
