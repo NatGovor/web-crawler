@@ -7,7 +7,8 @@
   (:use [slingshot.slingshot :only [try+]])
   (:refer-clojure :exclude [resolve])
   (:use clojurewerkz.urly.core)
-  (:import [java.net URI URL]))
+  (:import [java.net URI URL])
+  (:require [clojure.tools.cli :refer [cli]]))
 
 (defn read-file
   [file-name]
@@ -76,18 +77,18 @@
     (swap! (:children node) conj new-node)
     new-node))
 
-(defn visit-link
+(defn visit-links
   [urls depth node]
   (let [new-depth (dec depth)]
     (pmap #(parse-page % new-depth node) urls)))
 
 (defn crawling-loop
   [node urls depth]
-  (let [new-depth (dec depth)]
-    (if (> depth 0)
-      (doseq [new-node (visit-link urls depth node)]
-        (crawling-loop new-node (:urls new-node) new-depth)))
-    node))
+  (if (> depth 0)
+    (let [new-depth (dec depth)]
+      (doseq [new-node (visit-links urls depth node)]
+        (crawling-loop new-node (:urls new-node) new-depth))))
+    node)
 
 (defn crawling
   [file-name depth]
@@ -98,7 +99,9 @@
 
 (defn get-indent
   [n]
-  (apply str (repeat n " ")))
+  (if (<= n 0)
+    ""
+    (apply str (repeat n " "))))
 
 (defn get-message
   [status links-count location]
@@ -110,16 +113,17 @@
 
 (defn print-node
   [node level]
-  (let [indent (* 4 level)
+  (let [indent (* 4 (dec level))
         uri (:url node)
         status (:status node)
         links-count (count (:urls node))
         location (:location node)]
-    (println (get-indent indent) uri (get-message status links-count location))))
+    (println (str (get-indent indent) uri " " (get-message status links-count location)))))
 
 (defn walk-tree
   [node level]
-  (print-node node level)
+  (if (not (= level 0))
+    (print-node node level))
   (doseq [child @(:children node)] (walk-tree child (inc level))))
 
 (defn print-tree
@@ -129,8 +133,8 @@
 
 (defn -main
   [& args]
-  (let [file-name "resources/urls.txt"
-        depth 2
-        tree (crawling file-name depth)]
+  (let [[opts args] (cli args ["-f" "--file"  :default "resources/urls.txt"]
+                              ["-d" "--depth" :default "2"])
+        tree (crawling (:file opts) (Integer/parseInt (:depth opts)))]
     (print-tree tree)))
 
