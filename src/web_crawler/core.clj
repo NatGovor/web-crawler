@@ -15,8 +15,8 @@
     (doall (line-seq rdr))))
 
 (defn create-node
-  [url status depth children urls]
-  {:url url :status status :depth depth :children children :urls urls})
+  [url status depth children urls location]
+  {:url url :status status :depth depth :children children :urls urls :location location})
 
 (defn remove-nils
   [col]
@@ -63,8 +63,10 @@
   (let [html (fetch-page url)
         status (html :status)
         new-node (if (not= status 404)
-                   (create-node url status depth (atom '()) (parse-content url html))
-                   (create-node url status depth (atom '()) '()))]
+                   (if (?redirect status)
+                     (create-node url status depth (atom '()) (parse-content url html) (:location (html :headers)))
+                     (create-node url status depth (atom '()) (parse-content url html) nil))
+                   (create-node url status depth (atom '()) '() nil))]
     (swap! (:children node) conj new-node)
     new-node))
 
@@ -84,7 +86,7 @@
 (defn crawling
   [file-name depth]
   (let [urls (read-file file-name)
-        root  (create-node "root" nil 0 (atom '()) urls)]
+        root  (create-node "root" nil 0 (atom '()) urls nil)]
     (crawling-loop root urls depth)
     root))
 
@@ -92,12 +94,18 @@
   [n]
   (apply str (repeat n " ")))
 
+(defn ?redirect
+  [status]
+  (if (some #(= status %) '(301 302 303 305 307))
+    true
+    false))
+
 (defn get-message
-  [status links-count]
+  [status links-count location]
   (if (= status 404)
     (str " bad")
-    (if (= (.indexOf (str status) "3") 0)
-      (str " redirect " links-count)
+    (if (?redirect status)
+      (str links-count " redirect " location)
       (str links-count))))
 
 (defn print-node
@@ -105,8 +113,9 @@
   (let [indent (* 2 level)
         uri (:url node)
         status (:status node)
-        links-count (count (:urls node))]
-    (println (get-indent indent) uri (get-message status links-count))))
+        links-count (count (:urls node))
+        location (:location node)]
+    (println (get-indent indent) uri (get-message status links-count location))))
 
 (defn walk-tree
   [node level]
@@ -115,7 +124,7 @@
 
 (defn print-tree
   [root]
-  (do-walk root 0))
+  (walk-tree root 0))
 
 
 (defn -main
